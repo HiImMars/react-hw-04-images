@@ -14,15 +14,13 @@ export const Modal = ({ image, onCloseModal }) => {
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, []);
+  });
 
   const handleClick = event => {
     if (event.target === event.currentTarget) {
       onCloseModal();
     }
   };
-
-  // const { image } = props;
 
   return (
     <div className={css.overlay} onClick={handleClick}>
