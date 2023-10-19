@@ -1,4 +1,5 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
+import Notiflix from 'notiflix';
 
 import { Searchbar } from './Searchbar/Searchbar';
 import { ImageGallery } from './ImageGallery/ImageGallery';
@@ -6,90 +7,78 @@ import { Modal } from './Modal/Modal';
 import { Button } from './Button/Button';
 import { Loader } from './Loader/Loader';
 
-import { fetchImages } from '../services/api.js';
+import { getPictures } from '../services/api.js';
 
-export class App extends Component {
-  state = {
-    query: '',
-    images: [],
-    page: 1,
-    isModalOpen: false,
-    isLoading: false,
-    error: null,
-    loadMore: false,
-    totalPages: 1,
-    activeImage: null,
-  };
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [images, setImages] = useState([]);
+  const [page, setPage] = useState(1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [activeImage, setActiveImage] = useState(null);
 
-  async componentDidUpdate(_, prevState) {
-    if (
-      this.state.page !== prevState.page ||
-      this.state.query !== prevState.query
-    ) {
+  useEffect(() => {
+    if (!query) return;
+
+    const fetchData = async () => {
+      setIsLoading(true);
+
       try {
-        this.setState({
-          isLoading: true,
-        });
-        const images = await fetchImages(this.state.query, this.state.page);
-        this.setState(prevState => {
-          return {
-            images: prevState.images.concat(images.hits),
-          };
-        });
-      } catch (error) {
-        this.setState({ error: error.message });
-      } finally {
-        this.setState({
-          isLoading: false,
-        });
-      }
-    }
-  }
+        const data = await getPictures(query, page);
 
-  ClickHandler = () => {
-    this.setState(prevState => {
-      return {
-        page: prevState.page + 1,
-      };
-    });
+        if (!data.totalHits) {
+          Notiflix.Notify.failure(`Sorry, ${query} not found 😢`);
+        } else {
+          setImages(prevState => {
+            if (page === 1) {
+              return data.hits;
+            }
+            return [...prevState, ...data.hits];
+          });
+        }
+      } catch (error) {
+        Notiflix.Notify.failure(
+          'Sorry! This site is temporarily unavailable due to a technical issue.'
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [query, page]);
+
+  const clickHandler = () => {
+    setPage(page + 1);
   };
 
-  handleSubmit = evt => {
+  const handleSubmit = evt => {
     evt.preventDefault();
     const form = evt.currentTarget;
     const search = form.elements.search.value;
-    this.setState({ query: search, page: 1, images: [] });
+
+    setQuery(search);
+    setPage(1);
+    setImages([]);
   };
 
-  openModal = selectedImage => {
-    this.setState({ activeImage: selectedImage, isModalOpen: true });
+  const openModal = selectedImage => {
+    setActiveImage(selectedImage);
+    setIsModalOpen(true);
   };
 
-  closeModal = () => {
-    this.setState({ activeImage: null, isModalOpen: false });
+  const closeModal = () => {
+    setActiveImage(null);
+    setIsModalOpen(false);
   };
 
-  render() {
-    return (
-      <div className="wrapper">
-        <Searchbar onSubmit={this.handleSubmit} />
-        {this.state.isLoading && <Loader />}
-        {this.state.query && (
-          <ImageGallery
-            images={this.state.images}
-            onImageClick={this.openModal}
-          />
-        )}
-        {this.state.images.length >= 12 && (
-          <Button handleClick={this.ClickHandler} />
-        )}
-        {this.state.isModalOpen && (
-          <Modal
-            image={this.state.activeImage}
-            onCloseModal={this.closeModal}
-          />
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className="wrapper">
+      <Searchbar onSubmit={handleSubmit} />
+      {isLoading && <Loader />}
+      {query && <ImageGallery images={images} onImageClick={openModal} />}
+      {images.length > 11 && <Button handleClick={clickHandler} />}
+      {isModalOpen && <Modal image={activeImage} onCloseModal={closeModal} />}
+    </div>
+  );
+};
